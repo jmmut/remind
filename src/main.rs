@@ -52,28 +52,30 @@ fn try_parse(words: &[&str], now: NaiveTime) -> Result<Reminder, String> {
     };
 }
 
-fn parse_time_diff_action(words: &&[&str], i: &mut usize) -> Result<Reminder, String> {
+fn parse_time_diff_action(words: &[&str], i: &mut usize) -> Result<Reminder, String> {
     let time = parse_time_diff(words, i)?;
-    if words.len() <= *i {
-        return Err("Expected an action".to_string());
-    }
-    if ACTION_MARKERS.contains(&words[*i]) {
-        *i += 1;
-    }
-    let action = words[*i..].join(" ");
-    Ok(Reminder { time, action })
+    parse_action_until_end(&words, i, time)
 }
 
-fn parse_time_action(words: &&[&str], now: NaiveTime, i: &mut usize) -> Result<Reminder, String> {
-    let time = parse_time(words, i, now)?;
+fn parse_action_until_end(
+    words: &[&str],
+    i: &mut usize,
+    time: Duration,
+) -> Result<Reminder, String> {
     if words.len() <= *i {
-        return Err("Expected an action".to_string());
+        Err("Expected an action".to_string())
+    } else {
+        if ACTION_MARKERS.contains(&words[*i]) {
+            *i += 1;
+        }
+        let action = words[*i..].join(" ");
+        Ok(Reminder { time, action })
     }
-    if ACTION_MARKERS.contains(&words[*i]) {
-        *i += 1;
-    }
-    let action = words[*i..].join(" ");
-    Ok(Reminder { time, action })
+}
+
+fn parse_time_action(words: &[&str], now: NaiveTime, i: &mut usize) -> Result<Reminder, String> {
+    let time = parse_time(words, i, now)?;
+    parse_action_until_end(&words, i, time)
 }
 
 fn parse_action_time(words: &[&str], now: NaiveTime, i: &mut usize) -> Result<Reminder, String> {
@@ -83,21 +85,13 @@ fn parse_action_time(words: &[&str], now: NaiveTime, i: &mut usize) -> Result<Re
     return if words.len() <= *i {
         Err("Expected an action".to_string())
     } else {
-        let time_diff_index_opt = words
-            .iter()
-            .enumerate()
-            .rfind(|w| w.1 == &"in")
-            .map_or(None, |w| Some(w.0));
+        let time_diff_index_opt = words.iter().rposition(|w| w == &"in");
         if let Some(mut time_index) = &time_diff_index_opt {
             let action = words[*i..time_index].join(" ");
             let time = parse_time_diff(&words, &mut time_index)?;
             Ok(Reminder { time, action })
         } else {
-            let time_index_opt = words
-                .iter()
-                .enumerate()
-                .rfind(|w| w.1 == &"at")
-                .map_or(None, |w| Some(w.0));
+            let time_index_opt = words.iter().rposition(|w| w == &"at");
             if let Some(mut time_index) = &time_index_opt {
                 let action = words[*i..time_index].join(" ");
                 let time = parse_time(&words, &mut time_index, now)?;
@@ -292,5 +286,20 @@ mod tests {
         let now = NaiveTime::from_hms_opt(13, 51, 30).unwrap();
         let result = try_parse(&to_slice("remind me to do something at 7:10:31"), now);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_several_in() {
+        let result = try_parse(
+            &to_slice("remind me to write asdf in the notebook in 10 minutes"),
+            now(),
+        );
+        assert_eq!(
+            result,
+            Ok(Reminder {
+                time: Duration::from_secs(10 * 60),
+                action: "write asdf in the notebook".to_string(),
+            })
+        );
     }
 }
