@@ -2,28 +2,34 @@ use chrono::NaiveTime;
 use std::process::Command;
 use std::time::Duration;
 
-fn main() {
-    let args: Vec<String> = std::env::args().collect();
-    let args_ref: Vec<&str> = args.iter().map(String::as_str).collect();
-    let result = try_parse(&args_ref, chrono::Local::now().time());
-    match result {
-        Err(e) => println!("Error: {}", e),
-        Ok(reminder) => {
-            println!("setting up {:?}", reminder);
-            std::thread::sleep(reminder.time);
-            let _output = Command::new("osascript")
-                .arg("-e")
-                // .arg(format!("display notification \"{}\" with title \"Reminder\"", reminder.action))
-                .arg(format!("display alert \"{}\"", reminder.action))
-                .output()
-                .expect("command failed");
+type AnyError = Box<dyn std::error::Error>;
 
-            // println!("status: {}", _output.status);
-            // println!("stdout: {}", String::from_utf8_lossy(&_output.stdout));
-            // println!("stderr: {}", String::from_utf8_lossy(&_output.stderr));
-        }
+fn main() {
+    let result = set_reminder();
+    if let Err(e) = result {
+        println!("Error: {}", e);
     }
 }
+
+fn set_reminder() -> Result<(), AnyError> {
+    let args: Vec<String> = std::env::args().collect();
+    let args_ref: Vec<&str> = args.iter().map(String::as_str).collect();
+    let reminder = try_parse(&args_ref, chrono::Local::now().time())?;
+
+    println!("setting up {:?}", reminder);
+    std::thread::sleep(reminder.time);
+    let _output = Command::new("osascript")
+        .arg("-e")
+        // .arg(format!("display notification \"{}\" with title \"Reminder\"", reminder.action))
+        .arg(format!("display alert \"{}\"", reminder.action))
+        .output()?;
+
+    // println!("status: {}", _output.status);
+    // println!("stdout: {}", String::from_utf8_lossy(&_output.stdout));
+    // println!("stderr: {}", String::from_utf8_lossy(&_output.stderr));
+    Ok(())
+}
+
 const ACTION_MARKERS: [&str; 2] = ["to", "that"];
 
 #[derive(Debug, PartialEq)]
@@ -35,13 +41,13 @@ struct Reminder {
 fn try_parse(words: &[&str], now: NaiveTime) -> Result<Reminder, String> {
     let mut i = 1;
     if words.len() <= i {
-        return Err("Expected an action, 'in <time interval>', or 'me'".to_string());
+        return Err("Expected an action, 'at' <time>, 'in <time interval>', or 'me'".to_string());
     }
     if words[i] == "me" {
         i += 1;
     }
     if words.len() <= i {
-        return Err("Expected an action or 'in <time interval>'".to_string());
+        return Err("Expected an action, 'at' <time> or 'in <time interval>'".to_string());
     }
     return if words[i] == "in" {
         parse_time_diff_action(&words, &mut i)
