@@ -43,64 +43,76 @@ fn try_parse(words: &[&str], now: NaiveTime) -> Result<Reminder, String> {
     if words.len() <= i {
         return Err("Expected an action or 'in <time interval>'".to_string());
     }
-    if words[i] == "in" {
-        let time = parse_time_diff(words, &mut i)?;
-        if words.len() <= i {
-            return Err("Expected an action".to_string());
-        }
-        if ACTION_MARKERS.contains(&words[i]) {
-            i += 1;
-        }
-        let action = words[i..].join(" ");
-        Ok(Reminder {
-            time,
-            action,
-        })
+    return if words[i] == "in" {
+        parse_time_diff_action(&words, &mut i)
     } else if words[i] == "at" {
-        let time = parse_time(words, &mut i, now)?;
-        if words.len() <= i {
-            return Err("Expected an action".to_string());
-        }
-        if ACTION_MARKERS.contains(&words[i]) {
-            i += 1;
-        }
-        let action = words[i..].join(" ");
-        Ok(Reminder {
-            time,
-            action,
-        })
+        parse_time_action(&words, now, &mut i)
     } else {
-        if ACTION_MARKERS.contains(&words[i]) {
-            i += 1;
-        }
-        if words.len() <= i {
-            return Err("Expected an action".to_string());
-        }
-        let time_diff_index_opt = words.iter().enumerate().rfind(|w| w.1 == &"in").map_or(None, |w| Some(w.0));
-        if let Some(mut time_index) = &time_diff_index_opt {
-            let action = words[i..time_index].join(" ");
-            let time = parse_time_diff(&words, &mut time_index)?;
-            return Ok(Reminder {
-                time,
-                action,
-            });
-        }
+        parse_action_time(&words, now, &mut i)
+    }
+}
 
-        let time_index_opt = words.iter().enumerate().rfind(|w| w.1 == &"at").map_or(None, |w| Some(w.0));
-        if let Some(mut time_index) = &time_index_opt {
-            let action = words[i..time_index].join(" ");
-            let time = parse_time(&words, &mut time_index, now)?;
-            return Ok(Reminder {
-                time,
-                action,
-            });
-        }
-        let action = words[i..].join(" ");
+fn parse_time_diff_action(words: &&[&str], i: &mut usize) -> Result<Reminder, String> {
+    let time = parse_time_diff(words, i)?;
+    if words.len() <= *i {
+        return Err("Expected an action".to_string());
+    }
+    if ACTION_MARKERS.contains(&words[*i]) {
+        *i += 1;
+    }
+    let action = words[*i..].join(" ");
+    Ok(Reminder {
+        time,
+        action,
+    })
+}
+
+fn parse_time_action(words: &&[&str], now: NaiveTime, i: &mut usize) -> Result<Reminder, String> {
+    let time = parse_time(words, i, now)?;
+    if words.len() <= *i {
+        return Err("Expected an action".to_string());
+    }
+    if ACTION_MARKERS.contains(&words[*i]) {
+        *i += 1;
+    }
+    let action = words[*i..].join(" ");
+    Ok(Reminder {
+        time,
+        action,
+    })
+}
+
+fn parse_action_time(words: &[&str], now: NaiveTime, i: &mut usize) -> Result<Reminder, String> {
+    if ACTION_MARKERS.contains(&words[*i]) {
+        *i += 1;
+    }
+    if words.len() <= *i {
+        return Err("Expected an action".to_string());
+    }
+    let time_diff_index_opt = words.iter().enumerate().rfind(|w| w.1 == &"in").map_or(None, |w| Some(w.0));
+    if let Some(mut time_index) = &time_diff_index_opt {
+        let action = words[*i..time_index].join(" ");
+        let time = parse_time_diff(&words, &mut time_index)?;
         return Ok(Reminder {
-            time: Duration::from_secs(0),
+            time,
             action,
         });
     }
+
+    let time_index_opt = words.iter().enumerate().rfind(|w| w.1 == &"at").map_or(None, |w| Some(w.0));
+    if let Some(mut time_index) = &time_index_opt {
+        let action = words[*i..time_index].join(" ");
+        let time = parse_time(&words, &mut time_index, now)?;
+        return Ok(Reminder {
+            time,
+            action,
+        });
+    }
+    let action = words[*i..].join(" ");
+    return Ok(Reminder {
+        time: Duration::from_secs(0),
+        action,
+    });
 }
 
 fn parse_time_diff(words: &[&str], i: &mut usize) -> Result<Duration, String> {
