@@ -4,12 +4,13 @@
 A command line tool to set reminders.
 
 Reminders will create a pop-up in MacOs with a given message after a given delay.
-Reminders are non-persistent after a reboot.
+Reminders are non-persistent: they will be lost after a OS reboot,
+or if you close the terminal where the process is running, unless you detach it e.g. with nohup.
 
 ## Install:
 This will install the `remind` command so that it's available in your terminal.
 ```
-cargo install --force --path .
+cargo install --path .
 ```
 
 ## Example usages:
