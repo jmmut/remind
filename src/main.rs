@@ -14,9 +14,10 @@ fn main() {
 fn set_reminder() -> Result<(), AnyError> {
     let args: Vec<String> = std::env::args().collect();
     let args_ref: Vec<&str> = args.iter().map(String::as_str).collect();
-    let reminder = try_parse(&args_ref, chrono::Local::now().time())?;
+    let now = chrono::Local::now();
+    let reminder = try_parse(&args_ref, now.time())?;
 
-    println!("setting up {:?}", reminder);
+    println!("{} setting up {:?}", now.format("%H:%M:%S"), reminder);
     std::thread::sleep(reminder.time);
     let _output = Command::new("osascript")
         .arg("-e")
